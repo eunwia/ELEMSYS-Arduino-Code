@@ -1,0 +1,101 @@
+#include <Servo.h>
+#include <Wire.h> 
+#include <LiquidCrystal_I2C.h>
+
+LiquidCrystal_I2C lcd(0x27, 16, 2); 
+
+const int LED1_PIN = 2;
+const int LED2_PIN = 3;
+const int LED3_PIN = 4;
+const int LED4_PIN = 5;
+const int SERVO_PIN = 9;
+
+Servo myServo;
+
+void setup() {
+  Serial.begin(9600);     
+  Serial.setTimeout(100); 
+
+  lcd.init();
+  lcd.backlight();
+  lcd.setCursor(0, 0);
+  lcd.print("Ready...");
+
+  pinMode(LED1_PIN, OUTPUT);
+  pinMode(LED2_PIN, OUTPUT);
+  pinMode(LED3_PIN, OUTPUT);
+  pinMode(LED4_PIN, OUTPUT);
+
+  myServo.attach(SERVO_PIN);
+  myServo.write(0);       
+}
+
+void loop() {
+  if (Serial.available() > 0) {
+    String msg = Serial.readStringUntil('\n'); 
+    msg.trim();
+
+    if (msg.length() == 0) return;
+
+    if (msg.length() == 1) {
+      handleSingleChar(msg.charAt(0));
+    } else {
+      handleTextCommand(msg);
+    }
+  }
+}
+
+void handleSingleChar(char command) {
+  switch (command) {
+    case 'a': digitalWrite(LED1_PIN, HIGH);  break; 
+    case 'b': digitalWrite(LED1_PIN, LOW);   break; 
+    case 'c': digitalWrite(LED2_PIN, HIGH);  break; 
+    case 'd': digitalWrite(LED2_PIN, LOW);   break; 
+    case 'e': digitalWrite(LED3_PIN, HIGH);  break; 
+    case 'f': digitalWrite(LED3_PIN, LOW);   break; 
+    case 'g': digitalWrite(LED4_PIN, HIGH);  break; 
+    case 'h': digitalWrite(LED4_PIN, LOW);   break; 
+
+    case 'y':
+      digitalWrite(LED1_PIN, HIGH);
+      digitalWrite(LED2_PIN, HIGH);
+      digitalWrite(LED3_PIN, HIGH);
+      digitalWrite(LED4_PIN, HIGH);
+      break;  
+
+    case 'x':
+      digitalWrite(LED1_PIN, LOW);
+      digitalWrite(LED2_PIN, LOW);
+      digitalWrite(LED3_PIN, LOW);
+      digitalWrite(LED4_PIN, LOW);
+      break; 
+
+    case 'u': myServo.write(0);   break; 
+    case 'v': myServo.write(90);  break; 
+    case 'w': myServo.write(180); break; 
+
+    case 'z': 
+      lcd.clear(); 
+      break;
+
+    default:
+      break;
+  }
+}
+
+void handleTextCommand(String msg) {
+  if (msg.equalsIgnoreCase("STATUS")) {
+    Serial.println("OK");
+  } else {
+    lcd.clear();
+    lcd.setCursor(0, 0);
+    
+    if (msg.length() > 16) {
+      lcd.print(msg.substring(0, 16));
+      lcd.setCursor(0, 1);
+      lcd.print(msg.substring(16, min((int)msg.length(), 32)));
+    } else {
+      lcd.print(msg);
+    }
+  }
+}
