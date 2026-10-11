@@ -1,1 +1,47 @@
+//LEADER: BRIDGET D. NARTE
+// ALVAREZ, JOHN ARMAND
+// MONTALLANA, TRIXETTE RAIN
+// RAMOS, JHON ROVIC 
 
+int leds[] = {13, 12, 11, 10};
+int seg[] = {9, 8, 7, 6, 5, 4, 3};
+
+byte hex[16][7] = {
+  {1,1,1,1,1,1,0}, 
+  {0,1,1,0,0,0,0}, 
+  {1,1,0,1,1,0,1}, 
+  {1,1,1,1,0,0,1}, 
+  {0,1,1,0,0,1,1}, 
+  {1,0,1,1,0,1,1}, 
+  {1,0,1,1,1,1,1}, 
+  {1,1,1,0,0,0,0}, 
+  {1,1,1,1,1,1,1}, 
+  {1,1,1,1,0,1,1}, 
+
+  {1,1,1,0,1,1,1}, 
+  {0,0,1,1,1,1,1}, 
+  {1,0,0,1,1,1,0}, 
+  {0,1,1,1,1,0,1}, 
+  {1,0,0,1,1,1,1}, 
+  {1,0,0,0,1,1,1}  
+};
+
+void setup() {
+  for (int i = 0; i < 4; i++)
+    pinMode(leds[i], OUTPUT);
+
+  for (int i = 0; i < 7; i++)
+    pinMode(seg[i], OUTPUT);
+}
+
+void loop() {
+  for (int n = 0; n < 16; n++) {
+    for (int i = 0; i < 4; i++)
+      digitalWrite(leds[i], bitRead(n, 3 - i));
+
+    for (int i = 0; i < 7; i++)
+      digitalWrite(seg[i], hex[n][i]);
+
+    delay(1000);
+  }
+}
