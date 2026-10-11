@@ -12,7 +12,7 @@
 
 ---
 
-## 🌷 Project Members
+## 🌷 IOTIFY Members
 
 | No. | Name |
 |:---:|---|
