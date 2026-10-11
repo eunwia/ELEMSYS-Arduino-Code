@@ -1,0 +1,111 @@
+#include <WiFi.h>
+#include <BluetoothSerial.h>
+#include <FirebaseESP32.h>
+#include <ESP32Servo.h>
+
+BluetoothSerial SerialBT;
+Servo myServo;
+
+#define WIFI_SSID "BRIDGET_WIFI"
+#define WIFI_PASSWORD "12345678"
+
+#define API_KEY "AIzaSyDpvc3NpsH8B58GaCngOoxRl6TY2PiaxRo"
+#define DATABASE_URL "https://iotify-lab7-default-rtdb.firebaseio.com"
+
+#define LED1_PIN 23
+#define LED2_PIN 22
+#define LED3_PIN 21
+#define LED4_PIN 19
+#define SERVO_PIN 18
+
+bool led1State = false;
+bool led2State = false;
+bool led3State = false;
+bool led4State = false;
+bool servoState = false; // false = 0 deg, true = 90 deg
+
+FirebaseData fbdo;
+FirebaseAuth auth;
+FirebaseConfig config;
+
+void setup() {
+  Serial.begin(115200);
+
+  SerialBT.begin("IOTIFY_BLUETOOTH");
+  Serial.println("Bluetooth Started");
+
+   pinMode(LED1_PIN, OUTPUT);
+  pinMode(LED2_PIN, OUTPUT);
+  pinMode(LED3_PIN, OUTPUT);
+  pinMode(LED4_PIN, OUTPUT);
+
+  digitalWrite(LED1_PIN, LOW);
+  digitalWrite(LED2_PIN, LOW);
+  digitalWrite(LED3_PIN, LOW);
+  digitalWrite(LED4_PIN, LOW);
+
+  // Servo Setup
+  myServo.setPeriodHertz(50);
+  myServo.attach(SERVO_PIN, 500, 2400);
+  myServo.write(0);
+
+  // WiFi Setup
+  WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    Serial.print(".");
+  }
+  Serial.println("\nWiFi Connected");
+
+  // Firebase Setup
+  config.api_key = API_KEY;
+  config.database_url = DATABASE_URL;
+
+  if (Firebase.signUp(&config, &auth, "", "")) {
+    Serial.println("Firebase SignUp OK");
+  } else {
+    Serial.println(config.signer.signupError.message.c_str());
+  }
+
+  Firebase.begin(&config, &auth);
+  Firebase.reconnectWiFi(true);
+}
+
+void loop() {
+  if (SerialBT.available() && Firebase.ready()) {
+    char cmd = SerialBT.read();
+    Serial.print("Received: ");
+    Serial.println(cmd);
+
+    if (cmd == 'a') {
+      led1State = !led1State;
+      digitalWrite(LED1_PIN, led1State ? HIGH : LOW);
+      Firebase.setBool(fbdo, "/led1", led1State);
+      Serial.printf("LED 1 = %s\n", led1State ? "true" : "false");
+    } 
+    else if (cmd == 'b') {
+      led2State = !led2State;
+      digitalWrite(LED2_PIN, led2State ? HIGH : LOW);
+      Firebase.setBool(fbdo, "/led2", led2State);
+      Serial.printf("LED 2 = %s\n", led2State ? "true" : "false");
+    } 
+     else if (cmd == 'c') {
+      led3State = !led3State;
+      digitalWrite(LED3_PIN, led3State ? HIGH : LOW);
+      Firebase.setBool(fbdo, "/led3", led3State);
+      Serial.printf("LED 3 = %s\n", led3State ? "true" : "false");
+    } 
+      else if (cmd == 'd') {
+      led4State = !led4State;
+      digitalWrite(LED4_PIN, led4State ? HIGH : LOW);
+      Firebase.setBool(fbdo, "/led4", led4State);
+      Serial.printf("LED 4 = %s\n", led4State ? "true" : "false");
+    } 
+    else if (cmd == 's') {
+      servoState = !servoState;
+      myServo.write(servoState ? 90 : 0);
+      Firebase.setBool(fbdo, "/servo", servoState);
+      Serial.printf("Servo state = %s (%d deg)\n", servoState ? "true" : "false", servoState ? 90 : 0);
+    }
+  }
+}
