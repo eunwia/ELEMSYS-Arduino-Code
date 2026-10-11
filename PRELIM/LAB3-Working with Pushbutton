@@ -1,0 +1,120 @@
+const byte ledPins[] = {3, 4, 5, 6, 7, 8, 9, 10, 11};
+const byte buttonPin = 2;
+const byte NUM_LEDS = 9;
+
+byte click = 0;
+bool lastReading = LOW;
+bool buttonState = LOW;
+unsigned long lastDebounceTime = 0;
+const unsigned long debounceDelay = 50;
+
+void setup() {
+  for (byte i = 0; i < NUM_LEDS; i++) {
+    pinMode(ledPins[i], OUTPUT);
+    digitalWrite(ledPins[i], LOW);
+  }
+  pinMode(buttonPin, INPUT);
+  randomSeed(analogRead(A0));
+}
+
+void allOff() {
+  for (byte i = 0; i < NUM_LEDS; i++) {
+    digitalWrite(ledPins[i], LOW);
+  }
+}
+
+void pattern1() {
+  allOff();
+  for (byte i = 0; i < NUM_LEDS; i++) {
+    digitalWrite(ledPins[i], HIGH);
+    delay(100);
+    digitalWrite(ledPins[i], LOW);
+  }
+}
+
+void pattern2() {
+  allOff();
+  digitalWrite(ledPins[1], HIGH);
+  digitalWrite(ledPins[3], HIGH);
+  digitalWrite(ledPins[5], HIGH);
+  digitalWrite(ledPins[7], HIGH);
+  delay(500);
+  allOff();
+}
+
+void pattern3() {
+
+  allOff();
+  digitalWrite(ledPins[0], HIGH);
+  digitalWrite(ledPins[2], HIGH);
+  digitalWrite(ledPins[4], HIGH);
+  digitalWrite(ledPins[6], HIGH);
+  digitalWrite(ledPins[8], HIGH);
+
+  delay(500);
+  allOff();
+}
+
+void pattern4() {
+  for (byte i = 0; i < 5; i++) {
+    allOff();
+    digitalWrite(ledPins[i], HIGH);
+    digitalWrite(ledPins[8 - i], HIGH);
+    delay(500);
+  }
+  allOff();
+}
+
+void pattern5() {
+  allOff();
+  for (byte i = 0; i < 15; i++) {
+    byte randomLED = random(NUM_LEDS);
+    digitalWrite(ledPins[randomLED], HIGH);
+    delay(150);
+    digitalWrite(ledPins[randomLED], LOW);
+  }
+  allOff();
+}
+
+void runPattern() {
+  switch (click) {
+    case 0:
+      allOff();
+      break;
+    case 1:
+      pattern1();
+      break;
+    case 2:
+      pattern2();
+      break;
+    case 3:
+      pattern3();
+      break;
+    case 4:
+      pattern4();
+      break;
+    case 5:
+      pattern5();
+      break;
+  }
+}
+
+void loop() {
+  bool reading = digitalRead(buttonPin);
+  if (reading != lastReading) {
+    lastDebounceTime = millis();
+  }
+  if ((millis() - lastDebounceTime) > debounceDelay) {
+    if (reading != buttonState) {
+      buttonState = reading;
+      if (buttonState == HIGH) {
+        click++;
+        if (click > 5) {
+          click = 0;
+        }
+        runPattern();
+      }
+    }
+  }
+  lastReading = reading;
+}
