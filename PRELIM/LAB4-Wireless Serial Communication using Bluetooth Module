@@ -1,0 +1,78 @@
+#include <SoftwareSerial.h>
+#include <Servo.h>
+
+SoftwareSerial BM(7, 8);  
+
+Servo servo;
+
+const int led1 = 6;
+const int led2 = 5;
+const int led3 = 4;
+const int led4 = 3;
+
+void setup() {
+  Serial.begin(9600);
+  BM.begin(9600);
+ 
+  pinMode(led1, OUTPUT);
+  pinMode(led2, OUTPUT);
+  pinMode(led3, OUTPUT);
+  pinMode(led4, OUTPUT);
+
+  servo.attach(9);
+  servo.write(0);
+}
+
+void loop() {
+
+  while (BM.available()) {
+    char data = BM.read();
+    if (data == 'a') {
+      digitalWrite(led1, HIGH);
+    }
+    else if (data == 'b') {
+      digitalWrite(led1, LOW);
+    }
+    else if (data == 'c') {
+      digitalWrite(led2, HIGH);
+    }
+    else if (data == 'd') {
+      digitalWrite(led2, LOW);
+    }
+    else if (data == 'e') {
+      digitalWrite(led3, HIGH);
+    }
+    else if (data == 'f') {
+      digitalWrite(led3, LOW);
+    }
+    else if (data == 'g') {
+      digitalWrite(led4, HIGH);
+    }
+    else if (data == 'h') {
+      digitalWrite(led4, LOW);
+    }
+    else if (data == 'y') {
+      digitalWrite(led1, HIGH);
+      digitalWrite(led2, HIGH);
+      digitalWrite(led3, HIGH);
+      digitalWrite(led4, HIGH);
+    }
+    else if (data == 'x') {
+      digitalWrite(led1, LOW);
+      digitalWrite(led2, LOW);
+      digitalWrite(led3, LOW);
+      digitalWrite(led4, LOW);
+    }
+    else if (data == 'r') {
+      servo.write(0);
+    }
+    else if (data == 's') {
+      servo.write(90);
+    }
+    else if (data == 't') {
+      servo.write(180);
+    }
+    Serial.print("Received: ");
+    Serial.println(data);
+  }
+}
