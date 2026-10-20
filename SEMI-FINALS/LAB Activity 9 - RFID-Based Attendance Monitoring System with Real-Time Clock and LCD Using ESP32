@@ -1,0 +1,166 @@
+#include <SPI.h>
+#include <MFRC522.h>
+#include <Wire.h>
+#include <RTClib.h>
+#include <LiquidCrystal_I2C.h>
+
+#define SS_PIN       5   
+#define RST_PIN      4  
+#define BUZZER_PIN  15   
+#define I2C_SDA     21   
+#define I2C_SCL     22    
+
+const bool BUZZER_ACTIVE_LOW = false; 
+
+MFRC522 rfid(SS_PIN, RST_PIN);
+RTC_DS3231 rtc;
+LiquidCrystal_I2C lcd(0x27, 16, 2); 
+
+char daysOfTheWeek[7][12] = {"Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"};
+
+struct UserAccount {
+  String uid;
+  String name;
+};
+
+UserAccount registeredUsers[] = {
+  {"00 84 4A 1A", "John Armand Alvarez"}, 
+  {"C1 8B FA 24", "Jeff Salimbangon"},       
+  {"03 ED DC 11", "Trixette Rain"},
+  {"00 00 00 00", "Bridget Narte"} ,  
+  {"9C 5F EE DF", "Jhon Rovic A. Ramos"},   
+};
+
+const int totalUsers = sizeof(registeredUsers) / sizeof(registeredUsers[0]);
+
+void soundBuzzer(int durationMs) {
+  digitalWrite(BUZZER_PIN, BUZZER_ACTIVE_LOW ? LOW : HIGH);
+  delay(durationMs);
+  digitalWrite(BUZZER_PIN, BUZZER_ACTIVE_LOW ? HIGH : LOW);
+}
+
+void setup() {
+  Serial.begin(115200);
+  delay(500); 
+
+  Serial.println("\n=============================================");
+  Serial.println(" RFID Attendance System Starting... ");
+  Serial.println("=============================================");
+
+  pinMode(BUZZER_PIN, OUTPUT);
+  digitalWrite(BUZZER_PIN, BUZZER_ACTIVE_LOW ? HIGH : LOW);
+
+  SPI.begin();
+  rfid.PCD_Init();
+
+  Wire.begin(I2C_SDA, I2C_SCL);
+  lcd.init();
+  lcd.backlight();
+
+  if (!rtc.begin()) {
+    Serial.println("ERROR: Could not find DS3231 RTC Module!");
+    lcd.setCursor(0, 0);
+    lcd.print("RTC Module Error");
+    while (1); 
+  }
+
+  lcd.clear();
+  lcd.setCursor(0, 0);
+  lcd.print(" RFID System ");
+  lcd.setCursor(0, 1);
+  lcd.print(" Ready to Scan ");
+  
+  
+  soundBuzzer(100);
+  delay(1500);
+  lcd.clear();
+
+  Serial.println("System Ready! Tap an RFID card against the reader.");
+}
+
+void loop() {
+  DateTime now = rtc.now();
+
+  lcd.setCursor(0, 0);
+  lcd.print(daysOfTheWeek[now.dayOfTheWeek()]);
+  lcd.print(" ");
+  
+  if (now.hour() < 10) lcd.print('0');
+  lcd.print(now.hour(), DEC);
+  lcd.print(':');
+  
+  if (now.minute() < 10) lcd.print('0');
+  lcd.print(now.minute(), DEC);
+  lcd.print(':');
+  
+  if (now.second() < 10) lcd.print('0');
+  lcd.print(now.second(), DEC);
+  lcd.print("    ");
+
+  lcd.setCursor(0, 1);
+  lcd.print("Tap Card to Scan");
+
+  if (!rfid.PICC_IsNewCardPresent() || !rfid.PICC_ReadCardSerial()) {
+    return; 
+  }
+
+  String scannedUID = "";
+  for (byte i = 0; i < rfid.uid.size; i++) {
+    scannedUID.concat(String(rfid.uid.uidByte[i] < 0x10 ? " 0" : " "));
+    scannedUID.concat(String(rfid.uid.uidByte[i], HEX));
+  }
+  scannedUID.toUpperCase();
+  scannedUID.trim();
+
+  Serial.println("\n---------------------------------------------");
+  Serial.print("SCANNED CARD RAW UID: [");
+  Serial.print(scannedUID);
+  Serial.println("]");
+
+  String detectedName = "";
+  bool isRegistered = false;
+
+  for (int i = 0; i < totalUsers; i++) {
+    if (scannedUID == registeredUsers[i].uid) {
+      detectedName = registeredUsers[i].name;
+      isRegistered = true;
+      break;
+    }
+  }
+
+  if (isRegistered) {
+    soundBuzzer(150);
+
+    lcd.clear();
+    lcd.setCursor(0, 0);
+    lcd.print("Login Success!");
+    lcd.setCursor(0, 1);
+    lcd.print(detectedName);
+
+    Serial.print("STATUS: Access Granted -> ");
+    Serial.println(detectedName);
+  } else {
+    soundBuzzer(80);
+    delay(80);
+    soundBuzzer(80);
+
+    lcd.clear();
+    lcd.setCursor(0, 0);
+    lcd.print("Unknown Card!");
+    lcd.setCursor(0, 1);
+    lcd.print("UID: " + scannedUID.substring(0, 10));
+
+    Serial.println("STATUS: Unregistered Card!");
+    Serial.print("To register Trixette Rain A. Montallana, paste \"");
+    Serial.print(scannedUID);
+    Serial.println("\" into registeredUsers[] array in code.");
+  }
+
+  Serial.println("---------------------------------------------");
+
+  delay(3000);
+  lcd.clear();
+
+  rfid.PICC_HaltA();
+  rfid.PCD_StopCrypto1();
+}
