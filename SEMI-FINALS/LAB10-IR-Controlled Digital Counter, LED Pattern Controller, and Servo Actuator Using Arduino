@@ -1,1 +1,149 @@
-to be uploaded..
+#include <IRremote.hpp>
+#include <Servo.h>
+
+const int IR_RECEIVE_PIN = 2;
+
+const int LED1_PIN = 3;
+const int LED2_PIN = 4;
+const int LED3_PIN = 5;
+const int LED4_PIN = 6;
+
+const int SERVO_PIN = 9;
+
+const int LATCH_PIN = 8;  
+const int DATA_PIN  = 11; 
+const int CLOCK_PIN = 12; 
+
+#define CODE_1 0xF30CFF00
+#define CODE_2 0xE718FF00
+#define CODE_3 0xA15EFF00
+#define CODE_4 0xF708FF00
+#define CODE_5 0xE31CFF00
+#define CODE_6 0xA55AFF00
+
+bool led1State = false;
+bool led2State = false;
+bool led3State = false;
+bool led4State = false;
+bool servoState = false;
+
+const byte digitPatterns[10] = {
+  0b10111011, // 0
+  0b10000010, // 1
+  0b01011011, // 2
+  0b11001011, // 3
+  0b11100010, // 4
+  0b11101001, // 5
+  0b11111001, // 6
+  0b10000011, // 7
+  0b11111111, // 8
+  0b11101011  // 9
+};
+
+Servo myServo;
+
+void setup() {
+  Serial.begin(9600);
+
+  pinMode(LED1_PIN, OUTPUT);
+  pinMode(LED2_PIN, OUTPUT);
+  pinMode(LED3_PIN, OUTPUT);
+  pinMode(LED4_PIN, OUTPUT);
+
+  digitalWrite(LED1_PIN, LOW);
+  digitalWrite(LED2_PIN, LOW);
+  digitalWrite(LED3_PIN, LOW);
+  digitalWrite(LED4_PIN, LOW);
+
+  pinMode(LATCH_PIN, OUTPUT);
+  pinMode(DATA_PIN, OUTPUT);
+  pinMode(CLOCK_PIN, OUTPUT);
+
+  myServo.attach(SERVO_PIN);
+  myServo.write(0);
+
+  IrReceiver.begin(IR_RECEIVE_PIN, ENABLE_LED_FEEDBACK);
+  clearDisplay();
+
+  Serial.println("System Initialized! Ready for commands...");
+}
+
+void loop() {
+  if (IrReceiver.decode()) {
+    
+    if (IrReceiver.decodedIRData.flags & IRDATA_FLAGS_IS_REPEAT) {
+      IrReceiver.resume();
+      return;
+    }
+
+    unsigned long rawCode = IrReceiver.decodedIRData.decodedRawData;
+
+    Serial.print("IR Code Received: 0x");
+    Serial.println(rawCode, HEX);
+
+    // BUTTON 1: LED 1 
+    if (rawCode == CODE_1) {
+      led1State = !led1State; 
+      digitalWrite(LED1_PIN, led1State ? HIGH : LOW);
+      Serial.print("Pressed 1 -> LED 1 Toggled ");
+      Serial.println(led1State ? "ON" : "OFF");
+    }
+    // BUTTON 2: LED 2 
+    else if (rawCode == CODE_2) {
+      led2State = !led2State;
+      digitalWrite(LED2_PIN, led2State ? HIGH : LOW);
+      Serial.print("Pressed 2 -> LED 2 Toggled ");
+      Serial.println(led2State ? "ON" : "OFF");
+    }
+    // BUTTON 3: LED 3 
+    else if (rawCode == CODE_3) {
+      led3State = !led3State; 
+      digitalWrite(LED3_PIN, led3State ? HIGH : LOW);
+      Serial.print("Pressed 3 -> LED 3 Toggled ");
+      Serial.println(led3State ? "ON" : "OFF");
+    }
+    // BUTTON 4: LED 4 
+    else if (rawCode == CODE_4) {
+      led4State = !led4State; 
+      digitalWrite(LED4_PIN, led4State ? HIGH : LOW);
+      Serial.print("Pressed 4 -> LED 4 Toggled ");
+      Serial.println(led4State ? "ON" : "OFF");
+    }
+    // BUTTON 5: Servo (0 - 90) 
+    else if (rawCode == CODE_5) {
+      servoState = !servoState;
+      if (servoState) {
+        myServo.write(90);
+        Serial.println("Pressed 5 -> Servo Turned to 90°");
+      } else {
+        myServo.write(0);
+        Serial.println("Pressed 5 -> Servo Reset to 0°");
+      }
+    }
+    // BUTTON 6: Loop 7-Segment Display from 0 to 9 
+    else if (rawCode == CODE_6) {
+      Serial.println("Pressed 6 -> Running 7-Segment Count Loop (0-9)...");
+      for (int i = 0; i <= 9; i++) {
+        displayDigit(i);
+        delay(500);
+      }
+      clearDisplay();
+    }
+
+    IrReceiver.resume(); 
+  }
+}
+
+void displayDigit(int num) {
+  if (num >= 0 && num <= 9) {
+    digitalWrite(LATCH_PIN, LOW);
+    shiftOut(DATA_PIN, CLOCK_PIN, MSBFIRST, digitPatterns[num]);
+    digitalWrite(LATCH_PIN, HIGH);
+  }
+}
+
+void clearDisplay() {
+  digitalWrite(LATCH_PIN, LOW);
+  shiftOut(DATA_PIN, CLOCK_PIN, MSBFIRST, 0b00000000);
+  digitalWrite(LATCH_PIN, HIGH);
+}
