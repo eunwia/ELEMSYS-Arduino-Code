@@ -1,48 +1,169 @@
+/*
+LAB ACTIVITY 11 
+
+PIXEL AND IoTIFY
+
+Members: Delgado, Genegobis, Sayaang, Montallana, Narte, Ramos
+
+*/
+
 #include <esp_now.h>
 #include <WiFi.h>
 
-uint8_t receiverMAC[] = {0x88, 0xF1, 0x55, 0x32, 0x65, 0xF8};
+const int leds[7] = {4, 16, 17, 18, 19, 21, 22};
+const int N = 7;
+#define BUZZER 25
 
-#define BUTTON 32
+#define BRIGHT 255      // moving light
+#define DIM    15       // target glow
+
 enum Direction : uint8_t { CENTER, UP, DOWN, LEFT, RIGHT, BLINK };
+enum GameState { PLAYING, GAME_OVER };
 
 typedef struct {
   uint8_t dir;
 } Message;
-Message out;
 
-bool lastBtn = HIGH;
+Message in;
+volatile bool newData = false;
+
+GameState state = PLAYING;
+int target = 3;
+int pos = 0;
+int dir = 1;
+int level = 1;
+float speed = 150;          // ms per step (lower = faster)
+unsigned long lastStep = 0;
+unsigned long lastBlink = 0;
+bool scoreOn = true;
+
+// Runs when an ESP-NOW packet arrives (ESP32 Arduino core 3.x)
+void onRecv(const esp_now_recv_info_t *info, const uint8_t *data, int len) {
+  if (len == sizeof(Message)) {
+    memcpy(&in, data, sizeof(in));
+    newData = true;
+  }
+}
+
+void allLeds(int level) {
+  for (int i = 0; i < N; i++) analogWrite(leds[i], level);
+}
+
+void newTarget() {
+  int t;
+  do { t = random(0, N); } while (t == target);   // never the same spot twice
+  target = t;
+}
+
+void showPos() {
+  allLeds(0);
+  analogWrite(leds[target], DIM);
+  analogWrite(leds[pos], BRIGHT);
+}
+
+void resetRound() {
+  newTarget();
+  pos = 0;
+  dir = 1;
+  lastStep = millis();
+}
+
+void hit() {
+  level++;
+  speed = max(35.0f, speed * 0.8f);   // 20% faster each level
+  Serial.printf("HIT! Level %d\n", level);
+  allLeds(0);
+  for (int i = 0; i < 6; i++) {
+    analogWrite(leds[target], i % 2 == 0 ? BRIGHT : 0);
+    tone(BUZZER, 700 + i * 120, 70);   // rising happy beeps
+    delay(120);
+  }
+  delay(300);
+  resetRound();
+}
+
+void gameOver() {
+  Serial.printf("GAME OVER! Cleared %d levels\n", level - 1);
+
+  // Lights drain right to left with falling tones
+  int notes[7] = {392, 370, 349, 330, 311, 294, 262};
+  allLeds(BRIGHT);
+  for (int i = N - 1; i >= 0; i--) {
+    analogWrite(leds[i], 0);
+    tone(BUZZER, notes[N - 1 - i], 160);
+    delay(180);
+  }
+  delay(200);
+  tone(BUZZER, 150, 600);   // final long low buzz
+  delay(700);
+
+  state = GAME_OVER;
+  lastBlink = millis();
+}
+
+void showScore() {
+  // Blink as many LEDs as levels cleared
+  if (millis() - lastBlink >= 400) {
+    lastBlink = millis();
+    scoreOn = !scoreOn;
+    int cleared = min(level - 1, N);
+    allLeds(0);
+    if (scoreOn) {
+      for (int i = 0; i < cleared; i++) analogWrite(leds[i], BRIGHT);
+    }
+  }
+}
+
+void restart() {
+  Serial.println("New game! Level 1");
+  level = 1;
+  speed = 150;
+  state = PLAYING;
+  allLeds(0);
+  delay(300);
+  resetRound();
+}
 
 void setup() {
   Serial.begin(115200);
-  pinMode(BUTTON, INPUT_PULLUP);
+  pinMode(BUZZER, OUTPUT);
+  allLeds(0);
+
   WiFi.mode(WIFI_STA);
-  
   if (esp_now_init() != ESP_OK) {
-  Serial.println("ESP-NOW init failed");
-  return;
+    Serial.println("ESP-NOW init failed");
+    return;
   }
+  esp_now_register_recv_cb(onRecv);
 
-  esp_now_peer_info_t peer = {};
-  memcpy(peer.peer_addr, receiverMAC, 6);
-  peer.channel = 0;
-  peer.encrypt = false;
-  if (esp_now_add_peer(&peer) != ESP_OK) {
-  Serial.println("Add peer failed");
-  return;
-  }
-
-  Serial.println("Sender ready");
+  resetRound();
+  Serial.println("Stop the light! Level 1");
 }
 
 void loop() {
-  bool btn = digitalRead(BUTTON);
-  if (lastBtn == HIGH && btn == LOW) {
-    out.dir = BLINK;
-    esp_err_t result = esp_now_send(receiverMAC, (uint8_t *)&out,
-    sizeof(out));
-    Serial.println(result == ESP_OK ? "Press sent" : "Send error");
+  // Handle a button press sent from the sender
+  if (newData) {
+    newData = false;
+    if (in.dir == BLINK) {
+      if (state == GAME_OVER) {
+        restart();
+      } else if (pos == target) {
+        hit();
+      } else {
+        gameOver();
+      }
+    }
   }
-  lastBtn = btn;
-  delay(20); 
+
+  if (state == PLAYING) {
+    // Bounce the light back and forth
+    if (millis() - lastStep >= (unsigned long)speed) {
+      lastStep = millis();
+      pos += dir;
+      if (pos == N - 1 || pos == 0) dir = -dir;
+      showPos();
+    }
+  } else {
+    showScore();
+  }
 }
